@@ -9,6 +9,13 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
+  readFileSync: vi.fn(() => 'file-content'),
+}));
+
+const mockDigest = vi.fn(() => 'abc123');
+const mockUpdate = vi.fn(() => ({ digest: mockDigest }));
+vi.mock('node:crypto', () => ({
+  createHash: vi.fn(() => ({ update: mockUpdate })),
 }));
 
 vi.mock('node:path', () => {
@@ -171,6 +178,53 @@ describe('autoLint', () => {
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'prettier', ['--write', '/test/project/styles.css'],
         expect.objectContaining({ stdio: 'ignore' }),
+      );
+    });
+  });
+
+  describe('git add after formatting', () => {
+    it('stages file with git add when formatter changes content', () => {
+      // Arrange — simulate hash changing (different content before/after)
+      let hashCallCount = 0;
+      mockDigest.mockImplementation(() => {
+        hashCallCount++;
+        return hashCallCount <= 1 ? 'hash-before' : 'hash-after';
+      });
+      mockExecFileSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === 'which') return `/usr/local/bin/${args?.[0]}`;
+        if (cmd === 'biome') return 'Fixed 1 file';
+        return '';
+      });
+
+      // Act
+      autoLint(makeInput({
+        tool_input: { file_path: '/test/project/src/app.ts', content: 'code' },
+      }), testCtx);
+
+      // Assert — git add called with the file path
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        'git', ['add', '/test/project/src/app.ts'],
+        expect.objectContaining({ stdio: 'ignore' }),
+      );
+    });
+
+    it('skips git add when formatter does not change content', () => {
+      // Arrange — same hash before and after (no change)
+      mockDigest.mockReturnValue('same-hash');
+      mockExecFileSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === 'which') return `/usr/local/bin/${args?.[0]}`;
+        return '';
+      });
+
+      // Act
+      autoLint(makeInput({
+        tool_input: { file_path: '/test/project/src/app.ts', content: 'code' },
+      }), testCtx);
+
+      // Assert — git add should NOT be called
+      expect(mockExecFileSync).not.toHaveBeenCalledWith(
+        'git', expect.anything(),
+        expect.anything(),
       );
     });
   });

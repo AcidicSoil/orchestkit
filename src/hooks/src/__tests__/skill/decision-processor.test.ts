@@ -333,6 +333,20 @@ describe('decision-processor', () => {
       }
     });
 
+    test('preserves rationale text containing commas', () => {
+      // Arrange — commas should NOT truncate the rationale
+      const output = 'We decided to use PostgreSQL because it supports JSONB, has great indexing, and is well-tested.';
+
+      // Act
+      const decisions = extractEnrichedDecisions(output);
+
+      // Assert — rationale MUST be defined (this is the point of the comma fix)
+      expect(decisions.length).toBeGreaterThan(0);
+      expect(decisions[0].rationale).toBeDefined();
+      expect(decisions[0].rationale).toContain('great indexing');
+      expect(decisions[0].rationale).toContain('well-tested');
+    });
+
     test.each([
       ['because', 'it is faster'],
       ['since', 'it is more reliable'],
