@@ -121,9 +121,9 @@ function sendDesktopNotification(title: string, message: string): void {
       execFileSync('osascript', [
         '-e',
         `display notification "${escapeAppleScript(message)}" with title "${escapeAppleScript(title)}"`,
-      ], { timeout: 3000, stdio: 'ignore' });
+      ], { timeout: 3000, stdio: 'ignore', windowsHide: true });
     } else if (os === 'linux') {
-      execFileSync('notify-send', [title, message], { timeout: 3000, stdio: 'ignore' });
+      execFileSync('notify-send', [title, message], { timeout: 3000, stdio: 'ignore', windowsHide: true });
     }
   } catch {
     logHook(HOOK_NAME, 'Failed to send desktop notification');
@@ -155,6 +155,13 @@ export function denialNotification(input: HookInput, ctx: HookContext = NOOP_CTX
     );
 
     ctx.log(HOOK_NAME, 'Desktop notification sent for repeated denials');
+  }
+
+  // CC 2.1.89: Isolated denial (first in window) → suggest retry so user sees the prompt
+  // Only for explicit Bash/Write/Edit denials where retry makes sense.
+  // Skip when we're in a denial storm (THRESHOLD+) — no point pushing retry UI.
+  if (denialCount === 1 && /^(Bash|Write|Edit)$/.test(input.tool_name || '')) {
+    return { continue: true, suppressOutput: true, retry: true };
   }
 
   return outputSilentSuccess();
