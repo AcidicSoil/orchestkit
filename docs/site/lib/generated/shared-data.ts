@@ -135,7 +135,7 @@ export const AGENTS: AgentSummary[] = [
   },
   {
     "name": "emulate-engineer",
-    "description": "Stateful API emulation with Vercel emulate. Seeds GitHub/Vercel/Google/Slack/Apple/Entra/AWS/MongoDB API environments, configures webhooks and port isolation. Use when replacing flaky API mocks with stateful emulation.",
+    "description": "Stateful API emulation via Vercel emulate 0.4+. Seeds GitHub/Vercel/Google/Slack/Apple/Entra/AWS/MongoDB/Okta/Resend/Stripe, webhooks, port isolation, Next.js adapter. Use to replace flaky API mocks.",
     "plugins": [
       "ork"
     ],
