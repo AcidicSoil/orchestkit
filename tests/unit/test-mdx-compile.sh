@@ -18,8 +18,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCRIPT="$PROJECT_ROOT/scripts/test-mdx-compile.mjs"
-FIXTURE="$PROJECT_ROOT/tests/fixtures/nested-fence.mdx"
+DOCS_SITE="$PROJECT_ROOT/docs/site"
+SCRIPT="$DOCS_SITE/scripts/test-mdx-compile.mjs"
+FIXTURE="$DOCS_SITE/tests/fixtures/nested-fence.mdx"
 
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'
@@ -47,19 +48,44 @@ if [[ ! -f "$FIXTURE" ]]; then
   exit 1
 fi
 
-# Pre-flight: ensure devDeps are installed (root-level)
-if [[ ! -d "$PROJECT_ROOT/node_modules/@mdx-js/mdx" ]]; then
-  echo "  ${YELLOW}⚠${NC} @mdx-js/mdx not in root node_modules — running npm install"
-  (cd "$PROJECT_ROOT" && npm install --no-audit --no-fund 2>&1 | tail -3) || {
-    fail "npm install failed"
-    exit 1
-  }
+# Pre-flight: ensure docs/site has @mdx-js/mdx available (script needs it +
+# remark-gfm). Strategy:
+#   1. If already in node_modules → done.
+#   2. Otherwise try npm install. On 401 (private @yonatan-hq/analytics token
+#      not available in PR builds — same root cause as docs.yml's fallback),
+#      swap analytics to the local stub and retry. Mirrors docs.yml's pattern
+#      so the guard works on every PR even without the private token.
+if [[ ! -d "$DOCS_SITE/node_modules/@mdx-js/mdx" ]]; then
+  echo "  ${YELLOW}⚠${NC} @mdx-js/mdx not in docs/site/node_modules — installing"
+  INSTALL_LOG=$(mktemp)
+  trap 'rm -f "$INSTALL_LOG"' EXIT
+
+  set +e
+  (cd "$DOCS_SITE" && npm install --no-audit --no-fund 2>&1) >"$INSTALL_LOG"
+  npm_exit=$?
+  set -e
+
+  if [[ $npm_exit -ne 0 ]]; then
+    if grep -qE "401 Unauthorized|E401|unauthenticated" "$INSTALL_LOG"; then
+      echo "  ${YELLOW}⚠${NC} npm install hit 401 on @yonatan-hq/analytics — swapping to local stub and retrying"
+      (cd "$DOCS_SITE" && npm pkg set 'dependencies.@yonatan-hq/analytics=file:../stubs/analytics-stub' >/dev/null)
+      rm -f "$DOCS_SITE/package-lock.json"
+      (cd "$DOCS_SITE" && npm install --no-audit --no-fund 2>&1 | tail -3) || {
+        fail "npm install retried with stub still failed in docs/site"
+        exit 1
+      }
+    else
+      tail -10 "$INSTALL_LOG"
+      fail "npm install failed in docs/site (not auth-related — see log above)"
+      exit 1
+    fi
+  fi
 fi
 
 # ─── Test 1: every published mdx must compile ───────────────────────
 echo "▶ Test 1: docs/site/content/docs/**/*.mdx all compile cleanly"
 echo "────────────────────────────────────────────────────────────────"
-if (cd "$PROJECT_ROOT" && node "$SCRIPT" 2>&1); then
+if (cd "$DOCS_SITE" && node "$SCRIPT" 2>&1); then
   pass "All published mdx files compile"
 else
   fail "At least one published mdx file failed to compile"
@@ -69,7 +95,7 @@ echo ""
 # ─── Test 2: counter-example MUST fail ──────────────────────────────
 echo "▶ Test 2: counter-example fixture is rejected"
 echo "────────────────────────────────────────────────────────────────"
-if (cd "$PROJECT_ROOT" && node "$SCRIPT" "$FIXTURE" >/dev/null 2>&1); then
+if (cd "$DOCS_SITE" && node "$SCRIPT" "$FIXTURE" >/dev/null 2>&1); then
   fail "Counter-example $(basename "$FIXTURE") was NOT rejected — guard is broken"
   echo "    The fixture is supposed to fail. If it now compiles, either"
   echo "    @mdx-js/mdx changed its parser behavior, or someone 'fixed' the fixture."
