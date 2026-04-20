@@ -106,8 +106,10 @@ jobs:
   # ============================================================================
   create-prerelease:
     name: Create Prerelease
+    # GITHUB_TOKEN stays read-only — all writes (tag push, release creation)
+    # use a short-lived OrchestKit Release Bot installation token.
     permissions:
-      contents: write
+      contents: read
     needs: [validate-build, tests, matrix-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -115,9 +117,17 @@ jobs:
       tag_name: ${{ steps.create-release.outputs.tag_name }}
       prerelease_url: ${{ steps.create-release.outputs.prerelease_url }}
     steps:
+      - name: Mint Release Bot token
+        id: app-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3  # v3.1.1
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Determine branch
         id: branch
@@ -166,8 +176,10 @@ jobs:
 
       - name: Commit version stamp
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Attribute commits to the OrchestKit Release Bot App (matches the
+          # token that pushes them). 277719826 is the App's bot user id.
+          git config user.name "orchestkit-release-bot[bot]"
+          git config user.email "277719826+orchestkit-release-bot[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet || git commit -m "chore: stamp pre-release version ${{ steps.stamp.outputs.prerelease }}"
 
@@ -241,8 +253,10 @@ jobs:
           TAG="v${VERSION}"
 
           # Create and push tag (includes version-stamped commit)
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Attribute commits to the OrchestKit Release Bot App (matches the
+          # token that pushes them). 277719826 is the App's bot user id.
+          git config user.name "orchestkit-release-bot[bot]"
+          git config user.email "277719826+orchestkit-release-bot[bot]@users.noreply.github.com"
           git push origin HEAD
           git tag -a "$TAG" -m "Prerelease: ${{ steps.branch.outputs.name }} channel" HEAD
           git push origin "$TAG"
@@ -265,7 +279,7 @@ jobs:
           echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
           echo "prerelease_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Post release summary
         run: |
