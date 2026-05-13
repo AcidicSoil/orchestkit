@@ -295,19 +295,18 @@ for agent_result in agent_results:
 
 ### Worktree-Isolated Implementation (CC 2.1.50)
 
-Phase 5 agents SHOULD use `isolation: "worktree"` to prevent file conflicts:
+> ⚠️ **`isolation="worktree"` does NOT reliably isolate parallel agents in
+> CC Opus 4.7. Observed: spawning multiple agents with that param thrashes
+> the PRIMARY worktree's HEAD via sequential `git checkout`, cutting agents
+> off at ~60 tool uses. Tracked at Yonatan-HQ/platform#3224.**
 
-```python
-Agent(subagent_type="backend-system-architect",
-  prompt="Implement backend: {feature}. Architecture: {from 04-architecture.json}",
-  isolation="worktree", run_in_background=true)
-Agent(subagent_type="frontend-ui-developer",
-  prompt="Implement frontend: {feature}...",
-  isolation="worktree", run_in_background=true)
-Agent(subagent_type="test-generator",
-  prompt="Generate tests: {feature}...",
-  isolation="worktree", run_in_background=true)
-```
+**Use the manual pre-create pattern instead.** The lead creates one
+worktree per agent BEFORE spawning, and each agent prompt starts with
+`FIRST: cd <worktree-path>`. Empirical: 4–22 tool-uses per agent (vs
+60–86 with broken isolation), zero cutoffs across M164 Wave 2/3.
+
+Load full pattern + helper function + incident details + prompt
+constraints: `Read("${CLAUDE_SKILL_DIR}/references/manual-worktree-pattern.md")`
 
 ### Post-Deploy Monitoring (CC 2.1.71)
 
