@@ -386,21 +386,7 @@ Combine all agent feedback into a structured report. Load template: `Read("${CLA
 
 ### Memory Persistence
 
-After synthesis, persist critical/high findings to the memory graph so future reviews build on past knowledge:
-
-```python
-# Persist review findings for cross-session learning
-mcp__memory__create_entities(entities=[{
-    "name": "PR-{number}-Review",
-    "entityType": "code-review",
-    "observations": ["<summary>", "<critical findings>", "<patterns discovered>"]
-}])
-# Update known-weaknesses entity if new patterns found
-mcp__memory__add_observations(observations=[{
-    "entityName": "review-known-weaknesses",
-    "contents": ["<new pattern from this review>"]
-}])
-```
+After synthesis, persist critical/high findings to the memory graph for cross-session learning. The Phase 8c verdict writeback (below) handles this automatically when `yg-mcp-core>=0.3.0` is installed; for interactive sessions, see `references/memory-persistence.md` for the manual `mcp__memory__create_entities` + `mcp__memory__add_observations` pattern.
 
 ## Phase 6: Submit Review
 
@@ -411,6 +397,26 @@ gh pr review $PR_NUMBER --approve -b "Review message"
 # Request changes
 gh pr review $PR_NUMBER --request-changes -b "Review message"
 ```
+
+## Phase 8c — Verdict KG writeback (signal-fired, optional)
+
+After the verdict is submitted, optionally invoke `scripts/verdict_writeback.py <review-dir>` to persist the verdict + findings to the memory MCP knowledge graph. Self-skips on every non-happy-path so it never breaks the review:
+
+```bash
+python3 plugins/ork/skills/review-pr/scripts/verdict_writeback.py "$CLAUDE_JOB_DIR"
+```
+
+Auto-skip conditions (all exit 0, all WARN-logged):
+
+| Skip reason | Trigger |
+|-------------|---------|
+| `signal absent` | `verdict` missing OR not in `{approve, request-changes, comment}` |
+| `yg-mcp-core not importable` | `yg-mcp-core>=0.3.0` not installed (orchestkit is public; yg-mcp-core lives on private `pypi.yonyon.ai` — HQ-only) |
+| `memory MCP unreachable` | MCP server down OR `.mcp.json` doesn't define `memory` |
+
+Review dir must contain `review-output.json` (with `verdict`, `repo`, `pr_number`, optional `findings: [{level, msg}]`, optional `changed_paths: list[str]`). Handoff JSON at `<review-dir>/verdict-writeback.json` records `status` (`fired` / `skipped`) + the constructed `entity_name` (`review::<repo>#<n>@<ts>`).
+
+Mirrors the `/ork:assess` memory_writeback pattern from PR #1889. Closes orchestkit#1894.
 
 ## CC 2.1.20 Enhancements
 

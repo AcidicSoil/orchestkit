@@ -2248,6 +2248,7 @@ export const SKILLS: Record<string, SkillMeta> = {
       ],
       "scripts": [
         "dependency-mapper.sh",
+        "post_explore_summary.py",
         "render-spec.mjs"
       ]
     },
@@ -2400,6 +2401,8 @@ export const SKILLS: Record<string, SkillMeta> = {
         "runbook-entry-template.md"
       ],
       "scripts": [
+        "prior_fix_lookup.py",
+        "signature_lib.py",
         "similar-issue-finder.sh"
       ],
       "checklists": [
@@ -4263,11 +4266,15 @@ export const SKILLS: Record<string, SkillMeta> = {
     "complexity": "medium",
     "structure": {
       "references": [
+        "memory-persistence.md",
         "orchestration-mode-selection.md",
         "review-report-template.md",
         "review-template.md",
         "task-metrics-template.md",
         "validation-commands.md"
+      ],
+      "scripts": [
+        "verdict_writeback.py"
       ]
     },
     "plugins": [
