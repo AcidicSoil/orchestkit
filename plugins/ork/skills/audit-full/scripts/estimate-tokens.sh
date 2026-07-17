@@ -21,22 +21,44 @@ echo ""
 # Count lines by file type (excluding common non-source directories)
 EXCLUDE_DIRS="-path '*/node_modules' -o -path '*/.venv' -o -path '*/vendor' -o -path '*/__pycache__' -o -path '*/dist' -o -path '*/build' -o -path '*/.next' -o -path '*/out' -o -path '*/.git' -o -path '*/coverage'"
 
+# Total real lines across every file of one extension.
+#
+# `awk END{print NR}` rather than `wc -l`: wc counts newlines, so it under-reports by
+# one for every file whose last line lacks a trailing newline. awk counts records and
+# gets those right.
+#
+# `-exec ... {} +` rather than `xargs wc -l | tail -1`: xargs/find batch a long file
+# list, wc prints a total per batch, and tail keeps only the last one — silently
+# dropping every earlier batch. Summing the per-batch numbers with awk is correct at
+# any list length.
+#
+# awk rather than `grep -c ''`: grep exits 1 when nothing matches, which under
+# `set -euo pipefail` aborts the whole run as soon as one extension has only empty
+# files. awk exits 0 and prints 0.
 count_lines() {
+  local ext="$1"
+
+  # silent: best-effort — find reports unreadable paths per entry; the sum over readable files is the estimate, and one bad file must not abort a whole-codebase count
+  find "$PROJECT_DIR" \( $EXCLUDE_DIRS \) -prune -o -name "*.$ext" -exec awk 'END{print NR}' {} + 2>/dev/null \
+    | awk '{s+=$1} END{print s+0}'
+}
+
+# Print one table row and fold its tokens into TOTAL.
+# TOTAL is updated in place rather than echoed: a bash function has only stdout to
+# return through, and sharing it with the printf above is what silently zeroed the
+# total (the caller did arithmetic on the table row).
+add_type() {
   local ext="$1"
   local multiplier="$2"
   local label="$3"
 
-  local lines
-  lines=$(find "$PROJECT_DIR" \( $EXCLUDE_DIRS \) -prune -o -name "*.$ext" -print 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
-  lines=${lines:-0}
+  local lines tokens
+  lines=$(count_lines "$ext")
+  [ "$lines" -gt 0 ] || return 0
 
-  if [ "$lines" -gt 0 ]; then
-    local tokens=$((lines * multiplier))
-    printf "  %-20s %8d lines  ×%d  = %10d tokens\n" "$label" "$lines" "$multiplier" "$tokens"
-    echo "$tokens"
-  else
-    echo "0"
-  fi
+  tokens=$((lines * multiplier))
+  printf "  %-20s %8d lines  ×%d  = %10d tokens\n" "$label" "$lines" "$multiplier" "$tokens"
+  TOTAL=$((TOTAL + tokens))
 }
 
 echo "File Type             Lines         Multiplier    Tokens"
@@ -46,37 +68,30 @@ TOTAL=0
 
 # TypeScript/JavaScript (~8 tokens/line)
 for ext in ts tsx js jsx; do
-  result=$(count_lines "$ext" 8 ".$ext")
-  TOTAL=$((TOTAL + result))
+  add_type "$ext" 8 ".$ext"
 done
 
 # Python (~7 tokens/line)
-result=$(count_lines "py" 7 ".py")
-TOTAL=$((TOTAL + result))
+add_type "py" 7 ".py"
 
 # Go (~7 tokens/line)
-result=$(count_lines "go" 7 ".go")
-TOTAL=$((TOTAL + result))
+add_type "go" 7 ".go"
 
 # Config files (~5 tokens/line)
 for ext in json yaml yml toml; do
-  result=$(count_lines "$ext" 5 ".$ext")
-  TOTAL=$((TOTAL + result))
+  add_type "$ext" 5 ".$ext"
 done
 
 # CSS/SCSS (~6 tokens/line)
 for ext in css scss sass; do
-  result=$(count_lines "$ext" 6 ".$ext")
-  TOTAL=$((TOTAL + result))
+  add_type "$ext" 6 ".$ext"
 done
 
 # Markdown (~6 tokens/line)
-result=$(count_lines "md" 6 ".md")
-TOTAL=$((TOTAL + result))
+add_type "md" 6 ".md"
 
 # SQL (~6 tokens/line)
-result=$(count_lines "sql" 6 ".sql")
-TOTAL=$((TOTAL + result))
+add_type "sql" 6 ".sql"
 
 echo "------------------------------------------------------------"
 printf "  %-20s %35s\n" "TOTAL" "$TOTAL tokens"
