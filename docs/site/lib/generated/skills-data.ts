@@ -1188,7 +1188,7 @@ export const SKILLS: Record<string, SkillMeta> = {
     "name": "configure",
     "description": "Interactive wizard for OrchestKit settings: MCP servers, hook permissions, keybindings, and install presets. Use when customizing plugin behavior or managing settings.",
     "version": "1.0.1",
-    "sha256": "68b29d64d7213d39b4a056426a52cc9149a07716617067871eef4bcdaa6f951f",
+    "sha256": "d078d8a2e756cec41a2d1ed8502184c44076648117d4b41b121cb8b2bb08e6fe",
     "author": "OrchestKit",
     "tags": [
       "configuration",
@@ -3019,7 +3019,7 @@ export const SKILLS: Record<string, SkillMeta> = {
     "name": "llm-integration",
     "description": "LLM integration patterns for function calling, streaming responses, local inference with Ollama, and fine-tuning customization. Use when implementing tool use, SSE streaming, local model deployment, LoRA/QLoRA fine-tuning, or multi-provider LLM APIs.",
     "version": "2.0.0",
-    "sha256": "0cd145f6b3c5f7c0c04702975462fc06c0035b90e2e5e3b2e22987677d2dd2f0",
+    "sha256": "79bd8fe92bc5896ea32e26b427dcd4300221c4874b8239a37f19ad887f669bf8",
     "author": "OrchestKit",
     "tags": [
       "llm",
