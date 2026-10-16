@@ -2333,7 +2333,7 @@ export const SKILLS: Record<string, SkillMeta> = {
     "name": "explore",
     "description": "Multi-angle codebase exploration spawning 3-5 parallel agents for code structure, data flow, architecture patterns, and health assessment. Generates ASCII visualizations, import graphs, and design pattern detection with cross-session memory storage. Use when exploring a repo, discovering architecture, onboarding to a new codebase, or analyzing design patterns.",
     "version": "2.6.0",
-    "sha256": "ef9b58215cc9802ebcc8c99b842cb61d2e2d989c34fe07e59ff646bfa799527b",
+    "sha256": "4cf09ff267bc006fc577e6cf9a6d0620d42635f8ac399a96f2add2d933e96665",
     "author": "OrchestKit",
     "tags": [
       "exploration",
